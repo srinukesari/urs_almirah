@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package product;
+
+import "google/api/annotations.proto";
+
+option go_package = "./protobuf";
+
+service ProductService {
+    rpc GetProductDetails (ProductDetailsRequest) returns (ProductDetailsResponse);
+    rpc ListProducts (Empty) returns (ProductListResponse);
+}
+
+message ProductDetailsRequest {
+    int32 product_id = 1;
+}
+
+message ProductDetailsResponse {
+    int32 product_id = 1;
+    string name = 2;
+    string description = 3;
+    float price = 4;
+    int32 stock = 5;
+}
+
+message ProductListResponse {
+    repeated ProductDetailsResponse products = 1;
+}
+
+message Empty {}
