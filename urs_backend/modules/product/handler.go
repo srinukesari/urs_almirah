@@ -1,48 +1,76 @@
-package handler
+package product
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/jmoiron/sqlx" // Or any other DB library you are using, like GORM
+	pb "urs_backend/proto/protobuf"
 )
 
-// ProductServiceHandler implements the ProductServiceServer interface
-type ProductServiceHandler struct {
-	db *sqlx.DB // DB connection
+// ProductService implements the ProductServiceServer interface from the generated proto
+type ProductService struct {
+	Repo *ProductRepository
+	pb.UnimplementedProductServiceServer
 }
 
-// NewProductServiceHandler creates a new ProductServiceHandler with DB connection
-func NewProductServiceHandler(db *sqlx.DB) *ProductServiceHandler {
-	return &ProductServiceHandler{
-		db: db,
-	}
+func NewProductService(repo *ProductRepository) *ProductService {
+	return &ProductService{Repo: repo}
 }
 
-// GetProductDetails retrieves the details of a specific product by its ID
-func (h *ProductServiceHandler) GetProductDetails(ctx context.Context, req *product.ProductRequest) (*product.ProductDetails, error) {
-	// Use the DB connection to fetch product details
-	var productDetails product.ProductDetails
-	query := "SELECT product_id, name, description, price, stock FROM products WHERE product_id = ?"
-	err := h.db.Get(&productDetails, query, req.ProductId)
+// GetProductDetails retrieves a product by its ID
+func (s *ProductService) GetProductDetails(ctx context.Context, req *pb.ProductDetailsRequest) (*pb.ProductDetailsResponse, error) {
+	fmt.Printf("Comes inside GetProductDetails for product ID: %d\n", req.Id)
+
+	result, err := s.Repo.GetProductDetails(int(req.Id))
 	if err != nil {
-		return nil, fmt.Errorf("Product with ID %d not found: %v", req.ProductId, err)
+		return nil, err
 	}
 
-	return &productDetails, nil
+	return &pb.ProductDetailsResponse{
+		ProductId:   int32(result.ID),
+		Name:        result.Name,
+		Description: result.Description,
+		Price:       float32(result.Price),
+		Stock:       int32(result.Stock),
+	}, nil
 }
 
-// ListProducts retrieves a list of all available products
-func (h *ProductServiceHandler) ListProducts(ctx context.Context, req *product.Empty) (*product.ProductList, error) {
-	// Use the DB connection to fetch all products
-	var products []product.ProductDetails
-	query := "SELECT product_id, name, description, price, stock FROM products"
-	err := h.db.Select(&products, query)
+// ListProducts returns a list of products
+func (s *ProductService) ListProducts(ctx context.Context, req *pb.Empty) (*pb.ProductListResponse, error) {
+	result, err := s.Repo.ListProducts()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to fetch products: %v", err)
+		return nil, err
 	}
 
-	return &product.ProductList{
-		Products: products,
+	var productList []*pb.ProductDetailsResponse
+
+	for _, product := range result {
+		productList = append(productList, &pb.ProductDetailsResponse{
+			ProductId:   int32(product.ID),
+			Name:        product.Name,
+			Description: product.Description,
+			Price:       float32(product.Price),
+			Stock:       int32(product.Stock),
+		})
+	}
+
+	return &pb.ProductListResponse{
+		Products: productList,
+	}, nil
+}
+
+// AddProduct add product to db
+func (s *ProductService) AddProduct(ctx context.Context, req *pb.AddProductRequest,
+) (*pb.AddProductResponse, error) {
+	fmt.Printf("Comes inside AddProduct for product ID: %s\n", req.Name)
+
+	err := s.Repo.AddProduct(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.AddProductResponse{
+		Status: 200,
+		Error:  "",
 	}, nil
 }

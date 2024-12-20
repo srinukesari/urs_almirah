@@ -1,0 +1,8 @@
+migrate -path ./db/migrations 
+-database "postgres://srinukesari:srinukesari@localhost:5432/urs_products?sslmode=disable" up
+
+above is the cmd to apply database migrations for up and down!!!
+
+added proto for grpc communication between services
+
+postgresql databases added, setup local database for by changing creds

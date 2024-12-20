@@ -2,25 +2,27 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"urs_backend/modules/product"
+	pb "urs_backend/proto/protobuf"
 
-	"your-app/handler" // Replace with your actual Go module path
-	"your-app/product" // Replace with your actual Go module path
+	_ "github.com/lib/pq"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/jmoiron/sqlx" // Import sqlx for DB interaction
-	_ "github.com/lib/pq"     // Import PostgreSQL driver (or other DB driver)
 	"google.golang.org/grpc"
 )
 
-func startGRPCServer(db *sqlx.DB) {
+func startGRPCServer(db *sql.DB) {
 	grpcServer := grpc.NewServer()
 
+	repo := product.NewProductRepository(db)
+
 	// Register the ProductService handler with the DB connection
-	product.RegisterProductServiceServer(grpcServer, handler.NewProductServiceHandler(db))
+	pb.RegisterProductServiceServer(grpcServer, product.NewProductService(repo))
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -38,7 +40,7 @@ func startRESTServer() {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 
 	// Register the gRPC service with the HTTP proxy (gRPC-Gateway)
-	err := product.RegisterProductServiceHandlerFromEndpoint(
+	err := pb.RegisterProductServiceHandlerFromEndpoint(
 		context.Background(),
 		mux,
 		"localhost:50051", // gRPC server address
@@ -53,14 +55,23 @@ func startRESTServer() {
 }
 
 func main() {
-	// Set up the DB connection (PostgreSQL example using sqlx)
-	db, err := sqlx.Connect("postgres", "user=youruser dbname=yourdb sslmode=disable")
+	// Set up the DB connection
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		"localhost", "5432", "srinukesari", "srinukesari", "urs_products")
+
+	var err error
+	DB, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+
+	if err := DB.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	defer DB.Close()
 
 	// Run both servers concurrently
-	go startGRPCServer(db) // Start gRPC server
+	go startGRPCServer(DB) // Start gRPC server
 	startRESTServer()      // Start REST API server using gRPC-Gateway
 }
